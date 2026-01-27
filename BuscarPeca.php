@@ -19,5 +19,5 @@ if (isset($_GET['id_peca'])) {
         echo json_encode(['erro' => 'Peça não encontrada']);
     }
 }
-exit; // Garante que nada mais seja impresso
+exit; // Garante que nada mais seja impresso 
 ?>
