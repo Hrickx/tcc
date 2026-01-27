@@ -184,7 +184,11 @@ if(isset($_POST['email']) && isset($_POST['password'])) {
         </form>
 
         <div class="footer-links">
-            <p><a href="#">Esqueceu a senha?</a></p>
+           <p style="margin-top: 15px; font-size: 0.85rem; text-align: center;">
+    <a href="recuperar.php" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+        Esqueceu a senha?
+    </a>
+</p>
             <p style="margin-top: 12px;">Novo por aqui? <br> <a href="#">Solicite acesso à gerência</a></p>
         </div>
     </div>

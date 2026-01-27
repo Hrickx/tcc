@@ -330,41 +330,41 @@ $res_pedidos = $conn->query($sql_pedidos);
                     <h2>📝 Nova Solicitação</h2>
                     <form action="ProcessarPedido.php" method="POST">
                         <div class="form-group">
-                            <label>Peça para Reposição</label>
-                            <select name="id_peca" required>
-                                <option value="">Selecione...</option>
+                           <label>Peça:</label>
+                            <select name="id_peca" id="id_peca" onchange="atualizarValores()" required>
+                                <option value="">Selecione a peça...</option>
                                 <?php 
-                                $res_pecas->data_seek(0);
-                                while($p = $res_pecas->fetch_assoc()): ?>
-                                    <option value="<?= $p['id_peca'] ?>">
-                                        <?= $p['nome'] ?> (<?= $p['saldo_atual'] ?> un)
-                                    </option>
-                                <?php endwhile; ?>
+                                $res = $conn->query("SELECT id_peca, nome, preco_custo FROM pecas");
+                                while($p = $res->fetch_assoc()) {
+                                    // Guardamos o preço dentro de um atributo 'data-preco' para o JS ler depois
+                                    echo "<option value='{$p['id_peca']}' data-preco='{$p['preco_custo']}'>{$p['nome']}</option>";
+                                }
+                                ?>
                             </select>
-                        </div>
 
-                        <div class="form-group">
-                            <label>Fornecedor</label>
-                            <select name="id_fornecedor" required>
-                                <?php
-                                $sql_forn = "SELECT * FROM fornecedor";
-                                $res_f = $conn->query($sql_forn);
-                                while($f = $res_f->fetch_assoc()): ?>
-                                    <option value="<?= $f['id_fornecedor'] ?>"><?= $f['nome'] ?></option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
+                            <label>Quantidade:</label>
+                            <input type="number" name="quantidade" id="quantidade" min="1" value="1" oninput="atualizarValores()" required>
 
-                        <div class="form-group">
-                            <label>Quantidade</label>
-                            <input type="number" name="quantidade" min="1" required>
-                        </div>
+                            <label>Valor Unitário (R$):</label>
+                            <input type="text" id="valor_unitario_display" readonly>
+                            <input type="hidden" name="valor_unitario" id="valor_unitario">
 
-                        <div class="form-group">
-                            <label>Prazo Esperado (Dias)</label>
-                            <input type="number" name="tempo_entrega" min="1" required>
-                        </div>
+                            <label>Valor Total do Pedido (R$):</label>
+                            <input type="text" id="valor_total_display" readonly style="font-weight: bold; color: #10b981;">
+                            <input type="hidden" name="valor_total" id="valor_total">
 
+                            <div class="form-group">
+                                <label>Fornecedor:</label>
+                                <select name="id_fornecedor" required>
+                                    <option value="">Selecione o fornecedor...</option>
+                                    <?php 
+                                    $res_forn = $conn->query("SELECT id_fornecedor, nome FROM fornecedor");
+                                    while($f = $res_forn->fetch_assoc()) {
+                                        echo "<option value='{$f['id_fornecedor']}'>{$f['nome']}</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
                         <button type="submit" class="btn-enviar">Solicitar Compra</button>
                     </form>
                 </section>
@@ -374,12 +374,33 @@ $res_pedidos = $conn->query($sql_pedidos);
     </main>
 
     <script>
-    // Atualiza a página do estoquista a cada 30 segundos 
-    // para ele ver se o Ricardo já aprovou
-    setInterval(function(){
-        location.reload();
-    }, 30000); 
-</script>
+        function atualizarValores() {
+            const selectPeca = document.getElementById('id_peca');
+            const qtdInput = document.getElementById('quantidade');
+            
+            // Pega o preço que está guardado no atributo data-preco do option selecionado
+            const opcaoSelecionada = selectPeca.options[selectPeca.selectedIndex];
+            const precoUnitario = parseFloat(opcaoSelecionada.getAttribute('data-preco')) || 0;
+            const quantidade = parseInt(qtdInput.value) || 0;
 
+            const total = precoUnitario * quantidade;
+
+            // Atualiza os campos visíveis (formatados)
+            document.getElementById('valor_unitario_display').value = precoUnitario.toLocaleString('pt-br', {minimumFractionDigits: 2});
+            document.getElementById('valor_total_display').value = total.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
+
+            // Atualiza os campos escondidos que serão enviados pro PHP
+            document.getElementById('valor_unitario').value = precoUnitario;
+            document.getElementById('valor_total').value = total;
+        }
+
+        // Mantém a sessão ativa a cada 3 minutos (180000ms)
+        setInterval(() => {
+            fetch('ping.php')
+                .then(res => res.text())
+                .then(data => console.log("Sessão mantida: " + data))
+                .catch(err => console.error("Erro no ping de sessão"));
+        }, 180000); 
+    </script>
 </body>
 </html>

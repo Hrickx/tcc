@@ -132,12 +132,15 @@ $result = $conn->query($sql);
                     <p><strong>Solicitante:</strong> <?php echo $pedido['solicitante']; ?></p>
                     <p><strong>Fornecedor:</strong> <?php echo $pedido['fornecedor_nome']; ?></p>
                     
-                    <div class="info-row">
+                   <div class="info-row">
                         <span><strong>Qtd:</strong> <?php echo $pedido['quantidade']; ?></span>
-                        <span><strong>Total:</strong> R$ <?php echo number_format($pedido['valor_total_compra'], 2, ',', '.'); ?></span>
+                        <span><strong>Unit:</strong> R$ <?php echo number_format($pedido['valor_unitario'], 2, ',', '.'); ?></span>
+                        <span style="color: #10b981; font-weight: bold;">
+                            <strong>Total:</strong> R$ <?php echo number_format($pedido['valor_total_compra'], 2, ',', '.'); ?>
+                        </span>
                     </div>
 
-                    <form action="decidir_pedido.php" method="POST">
+                    <form action="DecidirPedido.php" method="POST">
                         <input type="hidden" name="id_pedido" value="<?php echo $pedido['id_pedido']; ?>">
                         
                         <button type="submit" name="acao" value="APROVAR" class="btn-aprovar">✅ Aprovar Pedido</button>

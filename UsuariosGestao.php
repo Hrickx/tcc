@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cadastrar'])) {
 }
 
 // Busca usuários existentes para listar na tabela
-$usuarios = $conn->query("SELECT id_usuario, nome, email, perfil FROM usuarios ORDER BY nome ASC");
+$usuarios = $conn->query("SELECT id_usuario, nome, email, perfil, status_usuario FROM usuarios ORDER BY nome ASC");
 ?>
 
 <!DOCTYPE html>
@@ -96,15 +96,15 @@ $usuarios = $conn->query("SELECT id_usuario, nome, email, perfil FROM usuarios O
                 </span>
             </td>
             <td>
-                <a href="EditarUsuario.php?id=<?php echo $user['id_usuario']; ?>" style="text-decoration:none; color:blue;">✏️ Editar</a> | 
+                <a href="EditarUsuario.php?id=<?php echo $user['id_usuario']; ?>" style="text-decoration:none; color:blue;"> Editar</a> | 
 
                 <?php if(($user['status_usuario'] ?? 'ATIVO') == 'ATIVO'): ?>
                     <a href="AlterarStatusUsuario.php?id=<?php echo $user['id_usuario']; ?>&novo_status=INATIVO" 
                        style="color:red; text-decoration:none;" 
-                       onclick="return confirm('Deseja realmente desativar este acesso?')">🚫 Desativar</a>
+                       onclick="return confirm('Deseja realmente desativar este acesso?')"> Desativar</a>
                 <?php else: ?>
                     <a href="AlterarStatusUsuario.php?id=<?php echo $user['id_usuario']; ?>&novo_status=ATIVO" 
-                       style="color:green; text-decoration:none;">✅ Reativar</a>
+                       style="color:green; text-decoration:none;"> Reativar</a>
                 <?php endif; ?>
             </td>
         </tr>

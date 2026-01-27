@@ -2,42 +2,43 @@
 session_start();
 include 'conexao.php';
 
-// Proteção: Apenas Gerente pode processar essa decisão
+// Definimos que a resposta é JSON logo no início
+header('Content-Type: application/json');
+
+// Proteção: Apenas Gerente pode processar
 if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'GERENTE') {
-    die("Acesso negado.");
+    echo json_encode(['success' => false, 'error' => 'Acesso negado.']);
+    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id_pedido = intval($_POST['id_pedido']); // Segurança extra com intval
-    $acao = $_POST['acao']; // 'APROVAR' ou 'REJEITAR'
-    $justificativa = isset($_POST['justificativa']) ? $_POST['justificativa'] : '';
+    $id_pedido = intval($_POST['id_pedido']);
+    $acao = $_POST['acao']; 
+    $justificativa = isset($_POST['justificativa']) ? $conn->real_escape_string($_POST['justificativa']) : '';
     $data_decisao = date('Y-m-d H:i:s');
 
-    // Sanitização para evitar SQL Injection
-    $justificativa = $conn->real_escape_string($justificativa);
-
-    if ($acao === 'APROVADO' || $acao === 'APROVAR') {
-        // Status deve ser 'APROVADO' para bater com o que o estoquista.php espera
+    if ($acao === 'APROVADO') {
         $sql = "UPDATE pedido_compra SET 
                 status = 'APROVADO', 
                 justificativa = NULL,
                 data_pedido = '$data_decisao'
-                WHERE id_pedido = '$id_pedido'";
+                WHERE id_pedido = $id_pedido";
         $msg = "Pedido aprovado com sucesso!";
     } else {
         $sql = "UPDATE pedido_compra SET 
                 status = 'REJEITADO', 
                 justificativa = '$justificativa',
                 data_pedido = '$data_decisao'
-                WHERE id_pedido = '$id_pedido'";
-        $msg = "Pedido rejeitado e justificativa enviada!";
+                WHERE id_pedido = $id_pedido";
+        $msg = "Pedido rejeitado com sucesso!";
     }
 
     if ($conn->query($sql) === TRUE) {
-        // O gerente volta para a sua tela principal
-        echo "<script>alert('$msg'); window.location.href='gerente.php';</script>";
+        echo json_encode(['success' => true, 'message' => $msg]);
     } else {
-        echo "Erro ao processar: " . $conn->error;
+        echo json_encode(['success' => false, 'error' => $conn->error]);
     }
+} else {
+    echo json_encode(['success' => false, 'error' => 'Método inválido.']);
 }
-?>
+exit;

@@ -298,6 +298,81 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
         cursor: pointer; 
         font-weight: bold; 
     }
+
+    /* Efeito de clique (diminui levemente) */
+.btn-aprovar:active, .btn-rejeitar:active {
+    transform: scale(0.95);
+}
+
+/* Classe para quando o botão estiver processando */
+.btn-loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+    position: relative;
+    pointer-events: none; /* Impede cliques duplos */
+}
+
+/* Opcional: Uma animação suave de transição */
+.btn-aprovar, .btn-rejeitar {
+    transition: all 0.2s ease;
+}
+
+/* Container do Dropdown */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* Botão Principal do Menu */
+.dropbtn {
+    background-color: #ffffff33; /* Transparente como o badge */
+    color: white;
+    padding: 8px 15px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border: 1px solid white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.dropbtn:hover {
+    background-color: #ffffff55;
+}
+
+/* Conteúdo do Dropdown (Escondido por padrão) */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: white;
+    min-width: 220px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1000;
+    border-radius: 8px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+/* Links dentro do menu */
+.dropdown-content a {
+    color: #1e293b;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dropdown-content a:hover {
+    background-color: #f8fafc;
+    color: #7c3aed;
+}
+
+/* Mostrar o menu ao passar o mouse (ou via JS) */
+.dropdown:hover .dropdown-content {
+    display: block;
+}
 </style>
 </head>
 <body>
@@ -308,12 +383,17 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
     <h1>AutoPeças Pro</h1>
     <div class="nav-right">
        
-        <a href="UsuariosGestao.php" class="btn-relatorio" style="background: #ffffff; color: #7c3aed; margin-right: 10px;">👤 Gerenciar Usuários</a>  
-
-        <a href="RelatorioMovimentacao.php" class="btn-relatorio">📊 Ver Movimentação de Estoque</a>
+        <div class="dropdown">
+            <button class="dropbtn"> Opções ▾</button>
+            <div class="dropdown-content">
+                <a href="HistoricoVendas.php">🛒 Histórico de Vendas</a>
+                <a href="RelatorioMovimentacao.php">📊 Movimentação de Estoque</a>
+                <a href="UsuariosGestao.php">👤 Gerenciar Usuários</a>
+            </div>
+        </div>
         
         <div class="notification-bell">
-            🔔<span id="bellDot" class="bell-dot"></span>
+            🔔<span id="bellDot" class="bell-dot" style="display: <?php echo ($qtd_pendentes > 0) ? 'block' : 'none'; ?>;"></span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -438,48 +518,128 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
         document.getElementById('rejeicao' + id).style.display = 'block'; 
     }
 
-    function decidir(tipo, id) {
+    function decidir(tipo, id, event) {
+        // Captura o botão corretamente
+        const btn = event ? event.target : window.event.target;
         const just = document.getElementById('justificativa' + id)?.value || '';
-        const acaoFormatada = tipo === 'aprovar' ? 'APROVADO' : 'REJEITADO';
+        const acao = tipo === 'aprovar' ? 'APROVADO' : 'REJEITADO';
 
-        if (tipo === 'rejeitar' && !just) { 
-            alert("Por favor, informe o motivo da rejeição."); 
-            return; 
+        if (tipo === 'rejeitar' && !just) {
+            alert("Por favor, informe o motivo da rejeição.");
+            return;
         }
+
+        // Feedback visual: desabilita o botão para evitar cliques duplos
+        btn.disabled = true;
+        btn.innerText = '...';
+
+        const formData = new URLSearchParams();
+        formData.append('id_pedido', id);
+        formData.append('acao', acao);
+        formData.append('justificativa', just);
 
         fetch('DecidirPedido.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `id_pedido=${id}&acao=${acaoFormatada}&justificativa=${just}`
+            body: formData.toString()
         })
-        .then(res => res.json())
+        .then(res => res.json()) // Aqui ele lê a resposta do PHP
         .then(dados => {
-            if(dados.success) {
-                alert("Pedido processado!");
-                location.reload();
+            if (dados.success) {
+                // --- AQUI ESTÁ A MÁGICA PARA SUMIR DA TELA ---
+                const linha = document.getElementById('pedido_' + id);
+                if (linha) {
+                    linha.style.transition = '0.5s';
+                    linha.style.opacity = '0';
+                    linha.style.background = '#d1fae5'; // Fundo verde rápido antes de sumir
+                    
+                    setTimeout(() => {
+                        linha.remove(); // Remove do HTML
+                        atualizarContadores(); // Atualiza os números nos cards
+                    }, 500);
+                }
+            } else {
+                alert("Erro do servidor: " + (dados.error || "Erro desconhecido"));
+                btn.disabled = false;
+                btn.innerText = tipo === 'aprovar' ? 'Aprovar' : 'Confirmar';
             }
+        })
+        .catch(err => {
+            console.error("Erro no Fetch:", err);
+            alert("Erro de conexão. Verifique o Console (F12).");
+            btn.disabled = false;
         });
     }
 
-    async function verificarNovosPedidos() {
+    // Função auxiliar para baixar o número no card de "Pendentes"
+    function atualizarContadores() {
+        const elemento = document.getElementById('pedidosPendentes');
+        if (elemento) {
+            let atual = parseInt(elemento.innerText) || 0;
+            if (atual > 0) elemento.innerText = atual - 1;
+        }
+    }
+
+   async function verificarNovosPedidos() {
         try {
-            const resposta = await fetch('checarpedidosajax.php?t=' + Date.now());
-            if (!resposta.ok) return;
+            const resposta = await fetch('ChecarPedidosAjax.php?t=' + Date.now());
             const dados = await resposta.json();
 
-            if (dados.tem_novo) {
-                dispararNotificacao(dados.solicitante, dados.peca);
-                setTimeout(() => { location.reload(); }, 3000);
+            // 1. Atualiza o contador no card vermelho (sem piscar)
+            const elementoContador = document.getElementById('pedidosPendentes');
+            const totalAtual = parseInt(elementoContador.innerText);
+            elementoContador.innerText = dados.total;
+
+            // 2. Se o número de pedidos aumentou, dispara o som e o sino
+            if (dados.total > totalAtual) {
+                dispararNotificacao(dados.pedidos[0].solicitante, dados.pedidos[0].peca_nome);
             }
-        } catch (erro) { }
+
+            // 3. ATUALIZA A TABELA DINAMICAMENTE (O pulo do gato)
+            renderizarTabela(dados.pedidos);
+
+        } catch (erro) { console.error("Erro na checagem"); }
+    }
+
+    function renderizarTabela(pedidos) {
+        const tbody = document.getElementById('listaPedidos');
+        if (pedidos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum pedido pendente.</td></tr>';
+            return;
+        }
+
+        // Reconstrói as linhas da tabela apenas se necessário
+        let html = '';
+        pedidos.forEach(ped => {
+            html += `
+                <tr id="pedido_${ped.id_pedido}">
+                    <td>${ped.solicitante}</td>
+                    <td><strong>${ped.peca_nome}</strong></td>
+                    <td>${ped.observacao}</td>
+                    <td>
+                        <button class="btn-aprovar" onclick="decidir('aprovar', ${ped.id_pedido})">Aprovar</button>
+                        <button class="btn-rejeitar" onclick="mostrarRejeicao(${ped.id_pedido})">Rejeitar</button>
+                    </td>
+                </tr>`;
+        });
+        tbody.innerHTML = html;
     }
 
     setInterval(verificarNovosPedidos, 5000);
 
-    document.getElementById('lucroDia').innerText = "R$ <?php echo number_format($valor_lucro, 2, ',', '.'); ?>";
-    document.getElementById('vendasQtd').innerText = "<?php echo $vendas_hoje; ?>";
-    document.getElementById('pedidosPendentes').innerText = "<?php echo $qtd_pendentes; ?>";
-    document.getElementById('estoqueCritico').innerText = "<?php echo $qtd_critico; ?>";
+        document.getElementById('lucroDia').innerText = "R$ <?php echo number_format($valor_lucro, 2, ',', '.'); ?>";
+        document.getElementById('vendasQtd').innerText = "<?php echo $vendas_hoje; ?>";
+        document.getElementById('pedidosPendentes').innerText = "<?php echo $qtd_pendentes; ?>";
+        document.getElementById('estoqueCritico').innerText = "<?php echo $qtd_critico; ?>";
+
+        document.querySelector('.notification-bell').addEventListener('click', function() {
+        document.getElementById('bellDot').style.display = 'none';
+    });
+
+    setInterval(() => {
+        fetch('ping.php');
+    }, 600000); // 10 minutos
+
     </script>
 </body>
 </html>

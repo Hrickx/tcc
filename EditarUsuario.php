@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['atualizar'])) {
     }
 
     if ($conn->query($sql)) {
-        echo "<script>alert('Dados atualizados!'); window.location.href='usuarios_gestao.php';</script>";
+        echo "<script>alert('Dados atualizados!'); window.location.href='UsuariosGestao.php';</script>";
     } else {
         echo "Erro: " . $conn->error;
     }
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['atualizar'])) {
 <body>
     <div class="card">
         <h2>Editar Funcionário</h2>
-        <form method="POST">
+        <form method="POST" action="EditarUsuario.php?id=<?php echo $id; ?>">
             <input type="hidden" name="id_usuario" value="<?php echo $dados['id_usuario']; ?>">
             
             <label>Nome:</label>

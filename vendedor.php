@@ -200,31 +200,42 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
     <main class="container">
         <section class="card">
             <h2>🛒 Registrar Nova Venda</h2>
-            <form action="ProcessarVenda.php" method="POST" id="vendaForm">
-                <div class="grid-form">
-                    <div class="form-group">
-                        <label for="id_peca">ID da Peça</label>
-                        <input type="number" name="id_peca" id="id_peca" placeholder="Ex: 1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="quantidade">Quantidade</label>
-                        <input type="number" name="quantidade" id="quantidade" value="1" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="preco">Preço Unitário (R$)</label>
-                        <input type="number" name="preco" id="preco" step="0.01" placeholder="0.00" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="desconto">Desconto (%) - Máx <?php echo $desc_max; ?>%</label>
-                        <input type="number" name="desconto" id="desconto" value="0" min="0" max="<?php echo $desc_max; ?>">
-                    </div>
-                </div>
+           <form action="ProcessarVenda.php" method="POST" id="vendaForm">
+    <div class="grid-form">
+        <div class="form-group">
+            <label for="id_peca">ID da Peça</label>
+            <input type="number" name="id_peca" id="id_peca" placeholder="Ex: 1" required>
+        </div>
+        <div class="form-group">
+            <label for="quantidade">Quantidade</label>
+            <input type="number" name="quantidade" id="quantidade" value="1" min="1" required>
+        </div>
+        <div class="form-group">
+            <label for="preco">Preço Unitário (R$)</label>
+            <input type="number" name="preco" id="preco" step="0.01" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+            <label for="desconto">Desconto (%) - Máx <?php echo $desc_max; ?>%</label>
+            <input type="number" name="desconto" id="desconto" value="0" min="0" max="<?php echo $desc_max; ?>">
+        </div>
+        <div class="form-group">
+            <label for="forma_pagamento">Forma de Pagamento</label>
+            <select name="forma_pagamento" id="forma_pagamento" required 
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; background: white;">
+                <option value="">Selecione...</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                <option value="Cartão de Débito">Cartão de Débito</option>
+                <option value="Pix">Pix</option>
+            </select>
+        </div>
+    </div>
 
-                <div class="total-box">
-                    <span>Valor Final Calculado: <strong id="valorFinal">R$ 0,00</strong></span>
-                    <button type="submit" class="btn-finalizar">Finalizar Venda</button>
-                </div>
-            </form>
+    <div class="total-box">
+        <span>Valor Final Calculado: <strong id="valorFinal">R$ 0,00</strong></span>
+        <button type="submit" class="btn-finalizar">Finalizar Venda</button>
+    </div>
+</form>
         </section>
 
         <section class="card">
@@ -242,13 +253,21 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
                 </thead>
                 <tbody>
                     <?php
-                    // SQL CORRIGIDO: v.id_vendedor
-                    $sql_vendas = "SELECT iv.id_venda, p.nome, iv.quantidade, iv.preco_unitario, (iv.quantidade * iv.preco_unitario) as total_calculado
-                                FROM itens_venda iv 
-                                JOIN pecas p ON iv.id_peca = p.id_peca 
-                                JOIN vendas v ON iv.id_venda = v.id_venda
-                                WHERE v.id_vendedor = '$id_vendedor'
-                                ORDER BY v.id_venda DESC LIMIT 5";
+                    // SQL CORRIGIDO: Agora pegamos o valor_total direto da tabela vendas, 
+                    // pois ele já contém o cálculo final com desconto processado no banco.
+                    $sql_vendas = "SELECT 
+                                        iv.id_venda, 
+                                        p.nome, 
+                                        iv.quantidade, 
+                                        iv.preco_unitario, 
+                                        v.valor_total as total_com_desconto,
+                                        v.desconto_aplicado
+                                    FROM itens_venda iv 
+                                    JOIN pecas p ON iv.id_peca = p.id_peca 
+                                    JOIN vendas v ON iv.id_venda = v.id_venda
+                                    WHERE v.id_vendedor = '$id_vendedor'
+                                    ORDER BY v.id_venda DESC LIMIT 10";
+                                    
                     $res = $conn->query($sql_vendas);
 
                     if($res && $res->num_rows > 0) {
@@ -256,9 +275,14 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
                             <tr>
                                 <td>#<?php echo $venda['id_venda']; ?></td>
                                 <td><?php echo $venda['nome']; ?></td>
-                                <td><?php echo $venda['quantidade']; ?></td>
+                                <td><?php echo $venda['quantidade']; ?> un</td>
                                 <td>R$ <?php echo number_format($venda['preco_unitario'], 2, ',', '.'); ?></td>
-                                <td>R$ <?php echo number_format($venda['total_calculado'], 2, ',', '.'); ?></td>
+                                
+                                <td style="font-weight: bold; color: #059669;">
+                                    R$ <?php echo number_format($venda['total_com_desconto'], 2, ',', '.'); ?>
+                                    
+                                </td>
+                    
                                 <td><span class="badge-status">Finalizada</span></td>
                             </tr>
                         <?php endwhile; 
@@ -270,33 +294,72 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
         </section>
     </main>
 
-    <script>
-        const inputQtd = document.getElementById('quantidade');
-        const inputPreco = document.getElementById('preco');
-        const inputDesc = document.getElementById('desconto');
-        const displayTotal = document.getElementById('valorFinal');
-        const limiteDesconto = <?php echo $desc_max; ?>;
-
-        function atualizarCalculo() {
-            const qtd = parseFloat(inputQtd.value) || 0;
-            const preco = parseFloat(inputPreco.value) || 0;
-            let desc = parseFloat(inputDesc.value) || 0;
-
-            if (desc > limiteDesconto) {
-                alert("Seu limite de desconto é de " + limiteDesconto + "%");
-                inputDesc.value = limiteDesconto;
-                desc = limiteDesconto;
+   <script>
+    // 1. Captura dos elementos do DOM
+    const inputIdPeca = document.getElementById('id_peca');
+    const inputQtd = document.getElementById('quantidade');
+    const inputPreco = document.getElementById('preco');
+    const inputDesc = document.getElementById('desconto');
+    const displayTotal = document.getElementById('valorFinal');
+    
+    // --- NOVA FUNÇÃO: BUSCAR PREÇO AUTOMÁTICO ---
+        inputIdPeca.addEventListener('blur', function() {
+            const id = this.value;
+            if (id > 0) {
+                fetch(`BuscarPeca.php?id_peca=${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.preco) {
+                            inputPreco.value = data.preco;
+                            atualizarCalculo(); // Recalcula o total após preencher o preço
+                        } else {
+                            alert("Peça não encontrada no estoque!");
+                            inputPreco.value = "";
+                        }
+                    })
+                    .catch(err => console.error("Erro ao buscar peça:", err));
             }
+        });
 
-            const subtotal = qtd * preco;
-            const total = subtotal - (subtotal * (desc / 100));
+    // 2. Definição do limite de desconto vindo do PHP
+    const limiteDesconto = <?php echo $desc_max; ?>;
 
-            displayTotal.innerText = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    // 3. Função principal de cálculo
+    function atualizarCalculo() {
+        const qtd = parseFloat(inputQtd.value) || 0;
+        const preco = parseFloat(inputPreco.value) || 0;
+        let desc = parseFloat(inputDesc.value) || 0;
+
+        // Validação de desconto em tempo real
+        if (desc > limiteDesconto) {
+            alert("Seu limite de desconto é de " + limiteDesconto + "%");
+            inputDesc.value = limiteDesconto;
+            desc = limiteDesconto;
         }
 
-        [inputQtd, inputPreco, inputDesc].forEach(input => {
-            input.addEventListener('input', atualizarCalculo);
-        });
-    </script>
+        // Cálculo matemático
+        const subtotal = qtd * preco;
+        const total = subtotal - (subtotal * (desc / 100));
+
+        // Atualização visual na tela com formatação de moeda brasileira
+        displayTotal.innerText = `R$ ${total.toLocaleString('pt-BR', { 
+            style: 'decimal',
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        })}`;
+    }
+
+    // 4. Adiciona os ouvintes de evento (escuta quando o usuário digita)
+    [inputQtd, inputPreco, inputDesc].forEach(input => {
+        input.addEventListener('input', atualizarCalculo);
+    });
+
+    // 5. Manter sessão ativa (Ping) para não deslogar durante o atendimento
+    setInterval(() => {
+        fetch('ping.php')
+            .then(res => console.log("Sessão mantida"))
+            .catch(err => console.error("Erro ao manter sessão"));
+    }, 180000); // 3 minutos
+</script>
 </body>
 </html>
