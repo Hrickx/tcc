@@ -27,7 +27,7 @@ if ($id > 0) {
 
     if ($res && $res->num_rows > 0) {
         $peca = $res->fetch_assoc();
-        // Retorna o preço em formato JSON para o JavaScript ler
+        // Retorna o preço em formato JSON para o JavaScript ler 
         echo json_encode(['preco' => $peca['preco_venda']]);
     } else {
         echo json_encode(['preco' => null]);
