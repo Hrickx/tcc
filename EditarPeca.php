@@ -1,21 +1,49 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão com as novas configurações
+session_start();
+
+// 3. Inclui a conexão com o banco
 include 'conexao.php';
 
 $id = $_GET['id'];
 $resultado = $conn->query("SELECT * FROM pecas WHERE id_peca = $id");
 $peca = $resultado->fetch_assoc();
 
-// Lógica de Update
+// Lógica de Update Protegida
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nome = $_POST['nome'];
     $descricao = $_POST['descricao'];
-    $preco_venda = $_POST['preco_venda'];
     $preco_custo = $_POST['preco_custo'];
 
-    $sql = "UPDATE pecas SET nome='$nome', descricao='$descricao', preco_venda='$preco_venda', preco_custo='$preco_custo' WHERE id_peca=$id";
+    // Se for GERENTE, ele atualiza tudo, incluindo o preço de venda
+    if ($_SESSION['perfil'] === 'GERENTE') {
+        $preco_venda = $_POST['preco_venda'];
+        $sql = "UPDATE pecas SET 
+                nome='$nome', 
+                descricao='$descricao', 
+                preco_custo='$preco_custo', 
+                preco_venda='$preco_venda' 
+                WHERE id_peca=$id";
+    } else {
+        // Se for ESTOQUISTA, o preço de venda NÃO entra no comando SQL
+        $sql = "UPDATE pecas SET 
+                nome='$nome', 
+                descricao='$descricao', 
+                preco_custo='$preco_custo' 
+                WHERE id_peca=$id";
+    }
     
     if ($conn->query($sql)) {
-        header("Location: estoquista.php?status=atualizado");
+        // Redireciona de volta para a tela do funcionário correto
+        $destino = ($_SESSION['perfil'] === 'GERENTE') ? 'gerente.php' : 'estoquista.php';
+        header("Location: $destino?status=atualizado");
+        exit();
+    } else {
+        echo "Erro ao atualizar: " . $conn->error;
     }
 }
 ?>
@@ -51,7 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <input type="number" step="0.01" name="preco_custo" value="<?php echo $peca['preco_custo']; ?>" required>
 
         <label>Preço de Venda (R$)</label>
-        <input type="number" step="0.01" name="preco_venda" value="<?php echo $peca['preco_venda']; ?>" required>
+        <input type="number" step="0.01" name="preco_venda" value="<?php echo $peca['preco_venda']; ?>" 
+            required <?php echo ($_SESSION['perfil'] !== 'GERENTE') ? 'readonly style="background-color: #f1f5f9; cursor: not-allowed; color: #64748b;"' : ''; ?>>
+        <?php if ($_SESSION['perfil'] !== 'GERENTE'): ?>
+            <p style="color: #ef4444; font-size: 12px; margin-top: 5px;">* Somente o gerente pode alterar o preço de venda.</p>
+        <?php endif; ?>
 
         <button type="submit">Salvar Alterações</button>
     </form>

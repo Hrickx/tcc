@@ -1,5 +1,12 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão com as novas configurações
 session_start();
+
+// 3. Inclui a conexão com o banco
 include 'conexao.php';
 
 // Proteção: Apenas Estoquista ou Gerente
@@ -131,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <label>Nome da Peça:</label>
         <input type="text" name="nome" placeholder="Ex: Pastilha de Freio" required>
 
-        <label>Preço de Venda (R$):</label>
+        <label>Preço de Custo (R$):</label>
         <input type="number" name="preco" step="0.01" placeholder="0.00" required>
 
         <label>Quantidade Inicial em Estoque:</label>

@@ -1,6 +1,16 @@
 <?php
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
 session_start();
+
 include 'conexao.php';
+
+// Proteção de acesso
+if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'VENDEDOR') {
+    header("Location: login.php");
+    exit();
+}
 
 // Ativa o lançamento de exceções para erros do MySQL
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);

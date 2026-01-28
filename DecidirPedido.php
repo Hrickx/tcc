@@ -1,6 +1,23 @@
 <?php
+// Força o PHP a manter a sessão por 8 horas antes de começar
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
 session_start();
+
 include 'conexao.php';
+
+// Bloqueio de segurança: Se a sessão sumir por um milissegundo, 
+// este bloco garante que o erro seja tratado antes de redirecionar sem motivo.
+if (!isset($_SESSION['id_usuario'])) {
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
+        // Se for uma requisição AJAX (como o ping ou busca), avisa o JS em vez de dar reload
+        header('HTTP/1.1 401 Unauthorized');
+        exit;
+    } else {
+        header("Location: login.php");
+        exit();
+    }
+}
 
 // Definimos que a resposta é JSON logo no início
 header('Content-Type: application/json');

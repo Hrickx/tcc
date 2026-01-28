@@ -1,12 +1,25 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão
 session_start();
 
-if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'GERENTE') {
-    header("Location: login.php");
-    exit();
-}
+// 3. Inclui a conexão
 include 'conexao.php';
 
+// 4. Proteção de acesso inteligente
+if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'GERENTE') {
+    // Se for uma requisição do JavaScript (AJAX), manda erro 401 em vez de redirecionar com header
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
+        header('HTTP/1.1 401 Unauthorized');
+        exit;
+    } 
+    // Se for acesso direto pela URL, vai para o login
+    header("Location: login.php");
+    exit();
+} 
 
 $nome_gerente = $_SESSION['nome'] ?? 'Gerente';
 
@@ -321,11 +334,13 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
 .dropdown {
     position: relative;
     display: inline-block;
+    padding-bottom: 10px; /* Cria uma área de respiro para o mouse não sair do elemento */
+    margin-bottom: -10px; /* Compensa o padding para não empurrar outros elementos */
 }
 
 /* Botão Principal do Menu */
 .dropbtn {
-    background-color: #ffffff33; /* Transparente como o badge */
+    background-color: #ffffff33;
     color: white;
     padding: 8px 15px;
     font-size: 0.85rem;
@@ -340,7 +355,7 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
     background-color: #ffffff55;
 }
 
-/* Conteúdo do Dropdown (Escondido por padrão) */
+/* Conteúdo do Dropdown */
 .dropdown-content {
     display: none;
     position: absolute;
@@ -350,8 +365,20 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1000;
     border-radius: 8px;
-    margin-top: 5px;
+    /* Alterado: em vez de margin, usamos top para encostar no botão */
+    top: 100%; 
     overflow: hidden;
+}
+
+/* O TRUQUE: Ponte invisível entre o botão e o menu */
+.dropdown-content::before {
+    content: "";
+    position: absolute;
+    top: -10px; /* Cobre o espaço vazio acima do menu */
+    left: 0;
+    width: 100%;
+    height: 10px;
+    background: transparent;
 }
 
 /* Links dentro do menu */
@@ -369,7 +396,7 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
     color: #7c3aed;
 }
 
-/* Mostrar o menu ao passar o mouse (ou via JS) */
+/* Mostrar o menu ao passar o mouse */
 .dropdown:hover .dropdown-content {
     display: block;
 }
@@ -389,6 +416,7 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
                 <a href="HistoricoVendas.php">🛒 Histórico de Vendas</a>
                 <a href="RelatorioMovimentacao.php">📊 Movimentação de Estoque</a>
                 <a href="UsuariosGestao.php">👤 Gerenciar Usuários</a>
+                <a href="GerenciarEstoque.php">💰 Gestão de Preços</a>
             </div>
         </div>
         
@@ -468,8 +496,13 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
                                 <td><strong><?php echo htmlspecialchars($ped['peca_nome']); ?></strong><br><small><?php echo htmlspecialchars($ped['fornecedor']); ?></small></td>
                                 <td><?php echo htmlspecialchars($ped['observacao']); ?></td>
                                 <td>
-                                    <button class="btn-aprovar" onclick="decidir('aprovar', <?php echo $ped['id_pedido']; ?>)">Aprovar</button>
+                                    <button class="btn-aprovar" onclick="executarDecisao('aprovar', <?php echo $ped['id_pedido']; ?>, this)">Aprovar</button>
                                     <button class="btn-rejeitar" onclick="mostrarRejeicao(<?php echo $ped['id_pedido']; ?>)">Rejeitar</button>
+
+                                    <div id="rejeicao<?php echo $ped['id_pedido']; ?>" style="display:none; margin-top:10px;">
+                                        <input type="text" id="justificativa<?php echo $ped['id_pedido']; ?>" placeholder="Motivo..." style="padding:5px; border-radius:4px; border:1px solid #ccc;">
+                                        <button class="btn-aprovar" style="padding: 4px" onclick="executarDecisao('rejeitar', <?php echo $ped['id_pedido']; ?>, this)">Confirmar</button>
+                                    </div>
                                     
                                     <div id="rejeicao<?php echo $ped['id_pedido']; ?>" style="display:none; margin-top:10px;">
                                         <input type="text" id="justificativa<?php echo $ped['id_pedido']; ?>" placeholder="Motivo..." style="padding:5px; border-radius:4px; border:1px solid #ccc;">
@@ -514,63 +547,60 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
         }, 5000);
     }
 
-    function mostrarRejeicao(id) { 
-        document.getElementById('rejeicao' + id).style.display = 'block'; 
+    // Função simples para mostrar a caixa de texto
+function mostrarRejeicao(id) {
+    const div = document.getElementById('rejeicao' + id);
+    if (div) div.style.display = 'block';
+}
+
+// Função única para processar a aprovação ou rejeição
+function executarDecisao(tipo, id, btn) {
+    const justInput = document.getElementById('justificativa' + id);
+    const just = justInput ? justInput.value : '';
+    const acaoFinal = (tipo === 'aprovar') ? 'APROVADO' : 'REJEITADO';
+
+    if (tipo === 'rejeitar' && !just) {
+        alert("Por favor, informe o motivo da rejeição.");
+        return;
     }
 
-    function decidir(tipo, id, event) {
-        // Captura o botão corretamente
-        const btn = event ? event.target : window.event.target;
-        const just = document.getElementById('justificativa' + id)?.value || '';
-        const acao = tipo === 'aprovar' ? 'APROVADO' : 'REJEITADO';
+    // Desabilita o botão para evitar cliques duplos
+    btn.disabled = true;
+    btn.innerText = '...';
 
-        if (tipo === 'rejeitar' && !just) {
-            alert("Por favor, informe o motivo da rejeição.");
-            return;
-        }
+    const formData = new URLSearchParams();
+    formData.append('id_pedido', id);
+    formData.append('acao', acaoFinal);
+    formData.append('justificativa', just);
 
-        // Feedback visual: desabilita o botão para evitar cliques duplos
-        btn.disabled = true;
-        btn.innerText = '...';
-
-        const formData = new URLSearchParams();
-        formData.append('id_pedido', id);
-        formData.append('acao', acao);
-        formData.append('justificativa', just);
-
-        fetch('DecidirPedido.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-        })
-        .then(res => res.json()) // Aqui ele lê a resposta do PHP
-        .then(dados => {
-            if (dados.success) {
-                // --- AQUI ESTÁ A MÁGICA PARA SUMIR DA TELA ---
-                const linha = document.getElementById('pedido_' + id);
-                if (linha) {
-                    linha.style.transition = '0.5s';
-                    linha.style.opacity = '0';
-                    linha.style.background = '#d1fae5'; // Fundo verde rápido antes de sumir
-                    
-                    setTimeout(() => {
-                        linha.remove(); // Remove do HTML
-                        atualizarContadores(); // Atualiza os números nos cards
-                    }, 500);
-                }
-            } else {
-                alert("Erro do servidor: " + (dados.error || "Erro desconhecido"));
-                btn.disabled = false;
-                btn.innerText = tipo === 'aprovar' ? 'Aprovar' : 'Confirmar';
+    fetch('DecidirPedido.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    })
+    .then(res => res.json())
+    .then(dados => {
+        if (dados.success) {
+            const linha = document.getElementById('pedido_' + id);
+            if (linha) {
+                linha.style.opacity = '0';
+                setTimeout(() => {
+                    linha.remove();
+                    atualizarContadores(); // Diminui o número no card
+                }, 500);
             }
-        })
-        .catch(err => {
-            console.error("Erro no Fetch:", err);
-            alert("Erro de conexão. Verifique o Console (F12).");
+        } else {
+            alert("Erro: " + dados.error);
             btn.disabled = false;
-        });
-    }
-
+            btn.innerText = (tipo === 'aprovar') ? 'Aprovar' : 'Confirmar';
+        }
+    })
+    .catch(err => {
+        alert("Erro de conexão.");
+        btn.disabled = false;
+    });
+}
+    
     // Função auxiliar para baixar o número no card de "Pendentes"
     function atualizarContadores() {
         const elemento = document.getElementById('pedidosPendentes');
@@ -601,24 +631,33 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
         } catch (erro) { console.error("Erro na checagem"); }
     }
 
-    function renderizarTabela(pedidos) {
+   function renderizarTabela(pedidos) {
         const tbody = document.getElementById('listaPedidos');
-        if (pedidos.length === 0) {
+        
+        // Não atualiza se o gerente estiver escrevendo uma justificativa
+        const camposAbertos = document.querySelectorAll('div[id^="rejeicao"][style*="display: block"]');
+        if (camposAbertos.length > 0) return; 
+
+        if (!pedidos || pedidos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum pedido pendente.</td></tr>';
             return;
         }
 
-        // Reconstrói as linhas da tabela apenas se necessário
         let html = '';
         pedidos.forEach(ped => {
             html += `
                 <tr id="pedido_${ped.id_pedido}">
                     <td>${ped.solicitante}</td>
-                    <td><strong>${ped.peca_nome}</strong></td>
+                    <td><strong>${ped.peca_nome}</strong><br><small>${ped.fornecedor}</small></td>
                     <td>${ped.observacao}</td>
                     <td>
-                        <button class="btn-aprovar" onclick="decidir('aprovar', ${ped.id_pedido})">Aprovar</button>
+                        <button class="btn-aprovar" onclick="executarDecisao('aprovar', ${ped.id_pedido}, this)">Aprovar</button>
                         <button class="btn-rejeitar" onclick="mostrarRejeicao(${ped.id_pedido})">Rejeitar</button>
+                        
+                        <div id="rejeicao${ped.id_pedido}" style="display:none; margin-top:10px;">
+                            <input type="text" id="justificativa${ped.id_pedido}" placeholder="Motivo..." style="padding:5px; border-radius:4px; border:1px solid #ccc;">
+                            <button class="btn-aprovar" style="padding: 4px" onclick="executarDecisao('rejeitar', ${ped.id_pedido}, this)">Confirmar</button>
+                        </div>
                     </td>
                 </tr>`;
         });
@@ -636,10 +675,28 @@ $vendas_hoje = $res_vendas_dia['total'] ?? 0;
         document.getElementById('bellDot').style.display = 'none';
     });
 
+   // Mantém a sessão viva e verifica se o Gerente ainda está logado
     setInterval(() => {
-        fetch('ping.php');
-    }, 600000); // 10 minutos
+        fetch('ping.php')
+            .then(response => {
+                if (response.status === 401) {
+                    // Se a sessão caiu, redireciona suavemente para o login
+                    window.location.href = 'login.php';
+                }
+            })
+            .catch(err => console.error("Erro de conexão"));
+    }, 60000); // Checa a cada 1 minuto
 
+    // Proteção para qualquer outro Fetch que você tenha (como relatórios ou notificações)
+    const originalFetch = window.fetch;
+    window.fetch = function() {
+        return originalFetch.apply(this, arguments).then(response => {
+            if (response.status === 401) {
+                window.location.href = 'login.php';
+            }
+            return response;
+        });
+    };
     </script>
 </body>
 </html>

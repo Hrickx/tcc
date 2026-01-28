@@ -1,11 +1,26 @@
 <?php
+// 1. Garante o tempo de 8 horas ANTES de iniciar
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
 session_start();
-// Proteção de acesso: só ESTOQUISTA entra aqui
+
+include 'conexao.php';
+
+// 2. Proteção de acesso inteligente
 if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'ESTOQUISTA') {
+    
+    // Se for uma requisição de fundo (AJAX/Fetch), enviamos erro 401 em vez de redirecionar
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest' || 
+        (isset($_GET['t']) || isset($_POST['id_pedido']))) { 
+        header('HTTP/1.1 401 Unauthorized');
+        exit;
+    } 
+
+    // Se for acesso normal pela barra de endereços, vai para o login
     header("Location: login.php");
     exit();
-}
-include 'conexao.php';
+} 
 
 $id_estoquista = $_SESSION['id_usuario'];
 $nome_estoquista = $_SESSION['nome'] ?? 'Estoquista';
@@ -373,34 +388,66 @@ $res_pedidos = $conn->query($sql_pedidos);
         </div>
     </main>
 
-    <script>
-        function atualizarValores() {
-            const selectPeca = document.getElementById('id_peca');
-            const qtdInput = document.getElementById('quantidade');
-            
-            // Pega o preço que está guardado no atributo data-preco do option selecionado
-            const opcaoSelecionada = selectPeca.options[selectPeca.selectedIndex];
-            const precoUnitario = parseFloat(opcaoSelecionada.getAttribute('data-preco')) || 0;
-            const quantidade = parseInt(qtdInput.value) || 0;
+   <script>
+    // 1. Sua função atual de cálculo de valores
+    function atualizarValores() {
+        const selectPeca = document.getElementById('id_peca');
+        const qtdInput = document.getElementById('quantidade');
+        
+        const opcaoSelecionada = selectPeca.options[selectPeca.selectedIndex];
+        const precoUnitario = parseFloat(opcaoSelecionada.getAttribute('data-preco')) || 0;
+        const quantidade = parseInt(qtdInput.value) || 0;
 
-            const total = precoUnitario * quantidade;
+        const total = precoUnitario * quantidade;
 
-            // Atualiza os campos visíveis (formatados)
-            document.getElementById('valor_unitario_display').value = precoUnitario.toLocaleString('pt-br', {minimumFractionDigits: 2});
-            document.getElementById('valor_total_display').value = total.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
+        document.getElementById('valor_unitario_display').value = precoUnitario.toLocaleString('pt-br', {minimumFractionDigits: 2});
+        document.getElementById('valor_total_display').value = total.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
 
-            // Atualiza os campos escondidos que serão enviados pro PHP
-            document.getElementById('valor_unitario').value = precoUnitario;
-            document.getElementById('valor_total').value = total;
-        }
+        document.getElementById('valor_unitario').value = precoUnitario;
+        document.getElementById('valor_total').value = total;
+    }
 
-        // Mantém a sessão ativa a cada 3 minutos (180000ms)
-        setInterval(() => {
-            fetch('ping.php')
-                .then(res => res.text())
-                .then(data => console.log("Sessão mantida: " + data))
-                .catch(err => console.error("Erro no ping de sessão"));
-        }, 180000); 
-    </script>
+    // 2. Mantém a sessão ativa e verifica se o usuário foi deslogado
+    setInterval(() => {
+        fetch('ping.php')
+            .then(res => {
+                if (res.status === 401) window.location.href = 'login.php';
+                return res.json();
+            })
+            .then(data => console.log("Sessão Estoquista Ativa"))
+            .catch(err => console.error("Erro no ping de sessão"));
+    }, 60000);
+
+    // 3. NOVO: Função para buscar a resposta do gerente sem precisar relogar
+    function verificarRespostasGerente() {
+        // O 't=' impede que o navegador use uma resposta velha guardada no cache
+        fetch('VerificarPedidos.php?t=' + Date.now()) 
+            .then(res => {
+                if (res.status === 401) window.location.href = 'login.php';
+                return res.json();
+            })
+            .then(dados => {
+                // Se o servidor indicar que algo mudou, ele atualiza a parte da tela ou a página
+                if (dados.houve_mudanca) {
+                    console.log("Nova resposta do gerente recebida!");
+                    location.reload(); // Atualiza a tela para mostrar o status novo
+                }
+            })
+            .catch(err => console.log("Aguardando resposta..."));
+    }
+
+    // Executa a busca por respostas a cada 5 segundos
+    setInterval(verificarRespostasGerente, 5000);
+
+    // 4. NOVO: Proteção extra ao clicar em botões para não cair na tela de login
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('click', function() {
+                // Faz um check rápido antes de processar qualquer ação grande
+                fetch('ping.php'); 
+            });
+        });
+    });
+</script>
 </body>
 </html>

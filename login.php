@@ -1,6 +1,13 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão com as novas configurações
 session_start();
-include('conexao.php');
+
+// 3. Inclui a conexão com o banco
+include 'conexao.php';
 
 if(isset($_POST['email']) && isset($_POST['password'])) {
     
@@ -189,7 +196,10 @@ if(isset($_POST['email']) && isset($_POST['password'])) {
         Esqueceu a senha?
     </a>
 </p>
-            <p style="margin-top: 12px;">Novo por aqui? <br> <a href="#">Solicite acesso à gerência</a></p>
+            <p style="margin-top: 12px; color: #64748b;">
+                Novo por aqui? <br> 
+                Solicite acesso à gerência
+            </p>
         </div>
     </div>
 

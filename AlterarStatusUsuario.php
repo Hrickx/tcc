@@ -1,5 +1,12 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão com as novas configurações
 session_start();
+
+// 3. Inclui a conexão com o banco
 include 'conexao.php';
 
 // Segurança: Só o gerente pode executar essa ação

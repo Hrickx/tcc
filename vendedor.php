@@ -1,5 +1,14 @@
 <?php
+// 1. Configurações de tempo (Sempre antes de tudo)
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+
+// 2. Inicia a sessão com as novas configurações
 session_start();
+
+// 3. Inclui a conexão com o banco
+include 'conexao.php';
+
 // Proteção de acesso: só VENDEDOR entra aqui
 if (!isset($_SESSION['id_usuario']) || $_SESSION['perfil'] !== 'VENDEDOR') {
     header("Location: login.php");
@@ -210,9 +219,14 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
             <label for="quantidade">Quantidade</label>
             <input type="number" name="quantidade" id="quantidade" value="1" min="1" required>
         </div>
-        <div class="form-group">
-            <label for="preco">Preço Unitário (R$)</label>
-            <input type="number" name="preco" id="preco" step="0.01" placeholder="0.00" required>
+      <div class="form-group">
+            <label for="preco_display">Preço Unitário (R$)</label>
+            <input type="number" id="preco_display" step="0.01" placeholder="0.00" 
+                readonly style="background-color: #f1f5f9; cursor: not-allowed; color: #64748b;">
+            
+            <input type="hidden" name="preco" id="preco">
+            
+            <small style="font-size: 10px; color: #94a3b8;">Preço automático via sistema</small>
         </div>
         <div class="form-group">
             <label for="desconto">Desconto (%) - Máx <?php echo $desc_max; ?>%</label>
@@ -303,23 +317,25 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
     const displayTotal = document.getElementById('valorFinal');
     
     // --- NOVA FUNÇÃO: BUSCAR PREÇO AUTOMÁTICO ---
-        inputIdPeca.addEventListener('blur', function() {
-            const id = this.value;
-            if (id > 0) {
-                fetch(`BuscarPeca.php?id_peca=${id}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.preco) {
-                            inputPreco.value = data.preco;
-                            atualizarCalculo(); // Recalcula o total após preencher o preço
-                        } else {
-                            alert("Peça não encontrada no estoque!");
-                            inputPreco.value = "";
-                        }
-                    })
-                    .catch(err => console.error("Erro ao buscar peça:", err));
-            }
-        });
+       inputIdPeca.addEventListener('blur', function() {
+    const id = this.value;
+    if (id > 0) {
+        fetch(`BuscarPeca.php?id_peca=${id}`)
+            .then(response => {
+                // Se o servidor retornar 401, a sessão caiu
+                if (response.status === 401) window.location.href = 'login.php';
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.preco) {
+                    document.getElementById('preco_display').value = data.preco; // Mostra na tela
+                    document.getElementById('preco').value = data.preco;         // Guarda para o PHP
+                    atualizarCalculo();
+                }
+            })
+            .catch(err => console.error("Erro ao buscar peça:", err));
+    }
+});
 
     // 2. Definição do limite de desconto vindo do PHP
     const limiteDesconto = <?php echo $desc_max; ?>;
@@ -355,11 +371,27 @@ $desc_max = $_SESSION['percentual_desconto_max'] ?? 5;
     });
 
     // 5. Manter sessão ativa (Ping) para não deslogar durante o atendimento
+    // Mantém a sessão viva "batendo na porta" do servidor a cada 60 segundos
     setInterval(() => {
         fetch('ping.php')
-            .then(res => console.log("Sessão mantida"))
-            .catch(err => console.error("Erro ao manter sessão"));
-    }, 180000); // 3 minutos
+            .then(response => {
+                if (response.status === 401) {
+                    // Se a sessão cair mesmo assim, avisa antes de deslogar
+                    window.location.href = 'login.php?erro=sessao_expirada';
+                }
+            })
+            .catch(err => console.log("Erro ao manter conexão"));
+    }, 60000);
+
+    // Impede que o formulário seja enviado se a sessão cair no último segundo
+    document.getElementById('vendaForm').addEventListener('submit', function(e) {
+        fetch('ping.php').then(res => {
+            if (res.status === 401) {
+                e.preventDefault();
+                alert("Sua sessão expirou. Por favor, faça login em outra aba para não perder os dados desta venda.");
+            }
+        });
+    });
 </script>
 </body>
 </html>
